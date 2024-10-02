@@ -12,10 +12,10 @@ import (
 )
 
 func main() {
-    rand.Seed(12664)
+    rand.Seed(123)
     fmt.Println("# Hello, World!")
 
-    table_sizes := []int{ 10, 100, 1000, 5000, 10000, 15000, 20000}
+    table_sizes := []int{ 10, 100, 1000, 5000, 10000, 15000, 20000, 40000, 80000}
     N_QUERIES := 100
 
     jg.CreateTables(table_sizes)
@@ -44,11 +44,14 @@ func main() {
     if err != nil {
       log.Fatal(err)
     }
-    qplans, err := os.Create("analyze_outputs.json")
+
+    analyze_filename := "analyze_outputs.json";
+    qplans, err := os.Create(analyze_filename)
     if err != nil {
       log.Fatal(err)
     }
-    out_csv, err := os.Create("query_times.csv")
+    qtimes_filename := "query_times.csv"
+    out_csv, err := os.Create(qtimes_filename)
     if err != nil {
       log.Fatal(err)
     }
@@ -57,16 +60,18 @@ func main() {
     fmt.Printf(          "Query, Cost, Query_time_ms\n")
     for i := 1; i <= N_QUERIES; i++ {
       q:= jg.GenerateQuery()
-      cost, micros, js := dbuser.RunTestAnalyzeQuery("analyze format=json " + q)
-      fmt.Fprintf(out_csv, "Q%f,  %f,  %f\n", i, cost, micros/1000.0)
-      fmt.Printf(          "Q%f,  %f,  %f\n", i, cost, micros)
+      cost, ms, js := dbuser.RunTestAnalyzeQuery("analyze format=json " + q)
+      fmt.Fprintf(out_csv, "Q%d,  %f,  %f\n", i, cost, ms)
+      fmt.Printf(          "Q%d,  %f,  %f\n", i, cost, ms)
 
-      fmt.Fprintf(qlog, "# Q%d : %d %f\nanalyze format=json\n%s\n", i, micros, cost, q);
-      fmt.Fprintf(qplans, "# Q%d : %d %f\nanalyze format=json\n%s\n%s", i, micros, cost, q, js);
+      fmt.Fprintf(qlog,   "# Q%d : cost=%f time=%f\nanalyze format=json\n%s\n",   i, cost, ms, q);
+      fmt.Fprintf(qplans, "# Q%d : cost=%f time=%f\nanalyze format=json\n%s\n%s\n\n", i, cost, ms, q, js);
     }
 
 
-    fmt.Println("# Queries written to " + filename)
+    fmt.Println("# Queries: " + filename)
+    fmt.Println("# Query times: " + qtimes_filename)
+    fmt.Println("# ANALYZE outputs: " + analyze_filename)
     err = qlog.Close()
     if err != nil {
       log.Fatal(err)
@@ -75,6 +80,7 @@ func main() {
     if err != nil {
       log.Fatal(err)
     }
+    out_csv.Close()
     dbuser.Close()
 }
 

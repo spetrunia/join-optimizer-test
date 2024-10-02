@@ -86,7 +86,7 @@ func RunTestQuery(query string) (float64, *sql.Rows) {
       rows.Close()
     }
   }
-  return mintime/(1000.0*1000), best_rows
+  return float64(mintime)/(1000.0*1000), best_rows
 }
 
 /*
