@@ -17,8 +17,8 @@ func main() {
     ns, _ := dbuser.RunTestQuery(query)
     fmt.Printf("Query %s, time=%d microsec\n", query, ns/1000)
 
-    ns, cost, js := dbuser.RunTestAnalyzeQuery(query)
-    fmt.Printf("Query %s, time=%d microsec, cost=%f\n", query, ns/1000, cost)
+    ms, cost, js := dbuser.RunTestAnalyzeQuery(query)
+    fmt.Printf("Query %s, time=%f microsec, cost=%f\n", query, ms, cost)
     fmt.Printf("analyze=%s\n", js)
 
     fmt.Println("# Done")

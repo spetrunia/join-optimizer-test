@@ -58,6 +58,13 @@ func (this *Column) sql_rand_value() string {
                      this.col_type.min_val, this.col_type.max_val, this.col_type.min_val);
 }
 
+/*
+  Fill the table column with random values from this domain.
+
+  @note
+    We just pick random value each time so we have no idea about n_distinct we will get!
+
+*/
 func (this *Column) set_fill_sql_base(this_table *Table) {
   this.fill_sql=
     "update " + this_table.name + "\n" +
@@ -66,14 +73,23 @@ func (this *Column) set_fill_sql_base(this_table *Table) {
   db_fill_commands= append(db_fill_commands, this.fill_sql)
 }
 
-func (this *Column) set_fill_sql_smaller(this_table *Table, prev_table string) {
+
+/*
+  Fill the column with subset of values from big_table.
+
+  N_DISTINCT(this) will be lower than N_DISTINCT(big_table.column).
+  
+  We don't control how much lower.
+*/
+
+func (this *Column) set_fill_sql_smaller(this_table *Table, big_table string) {
   sql1 :=
     "create temporary table tmp as\n" +
     "select \n" +
     "  " + this.col_type.name + " value,\n" +
     "  row_number() over () as nr\n" +
     "from\n" +
-    "  " + prev_table + "\n" +
+    "  " + big_table + "\n" +
     "order by rand() limit " + fmt.Sprintf("%d", this_table.size) + ";\n"
 
   sql2:=
@@ -87,13 +103,14 @@ func (this *Column) set_fill_sql_smaller(this_table *Table, prev_table string) {
   db_fill_commands= append(db_fill_commands, sql2)
   this.fill_sql = sql1 + sql2
 }
+
 /*********************************************************************/
 var domainNumber int
 
-func createDomain() Domain {
+func createDomain(target_size int) Domain {
   domainNumber++
   new_name:= fmt.Sprintf("col%d", domainNumber)
-  return Domain{min_val: 10, max_val: 100, name: new_name}
+  return Domain{min_val: 1, max_val: rand.Intn(target_size), name: new_name}
 }
 
 func (tbl Table) ddl() string {
@@ -139,10 +156,10 @@ func getRandomTable() string {
 /*
   Create a few tables with only PK.
 */
-func CreateTables() {
+func CreateTables(table_sizes []int) {
   tableByName = make(map[string]*Table)
-  TABLE_SIZES := []int{ 10, 100, 1000, 10000}
-  for _, size := range TABLE_SIZES {
+  //TABLE_SIZES := []int{ 10, 100, 1000, 10000}
+  for _, size := range table_sizes {
     tbl := Table{ name: fmt.Sprintf("t%d", size), size: size }
     tableByName[tbl.name]= &tbl
     tableByNumber= append(tableByNumber, tbl.name)
@@ -234,9 +251,16 @@ func CreateJoinCols() {
     connected_set= append(connected_set, tbl)
     //printArray(connected_set)
 
-    new_domain := createDomain()
+
     ptbl := tableByName[tbl];
     pjoin_tbl := tableByName[join_tbl];
+
+    max_size:= ptbl.size
+    if max_size < pjoin_tbl.size {
+      max_size= pjoin_tbl.size
+    }
+
+    new_domain := createDomain(max_size)
     tbl_col := ptbl.addColumn(&new_domain, join_tbl)
     join_tbl_col := pjoin_tbl.addColumn(&new_domain, tbl)
 

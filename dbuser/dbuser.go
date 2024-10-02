@@ -65,7 +65,7 @@ func RunQuery(query string) {
   @return
     (query_speed, query_result)
 */
-func RunTestQuery(query string) (int64, *sql.Rows) {
+func RunTestQuery(query string) (float64, *sql.Rows) {
   var mintime int64
   var best_rows *sql.Rows
   mintime= math.MaxInt64
@@ -86,13 +86,18 @@ func RunTestQuery(query string) (int64, *sql.Rows) {
       rows.Close()
     }
   }
-  return mintime/1000, best_rows
+  return mintime/(1000.0*1000), best_rows
 }
 
 /*
- go get -u github.com/buger/jsonparser
+  Parser:
+    go get -u github.com/buger/jsonparser
+   
+  @return 
+     min_time, cost, value
+
 */
-func RunTestAnalyzeQuery(query string) (int64, float64, string) {
+func RunTestAnalyzeQuery(query string) (float64, float64, string) {
 
   min_time, best_rows := RunTestQuery(query)
 
@@ -108,12 +113,13 @@ func RunTestAnalyzeQuery(query string) (int64, float64, string) {
   if err := best_rows.Scan(&value); err != nil {
     log.Fatal(err)
   }
+  best_rows.Close()
   // Parse the JSON
   cost, err :=jsonparser.GetFloat(value, "query_block", "cost")
   if (err != nil) {
     log.Fatal(err);
   }
-  return min_time, cost, string(value);
+  return cost, min_time, string(value);
 }
 
 

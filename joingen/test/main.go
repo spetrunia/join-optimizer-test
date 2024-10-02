@@ -12,7 +12,8 @@ func main() {
     rand.Seed(12664)
     fmt.Println("# Hello, World!")
 
-    jg.CreateTables()
+    table_sizes := []int{ 10, 100, 1000, 10000}
+    jg.CreateTables(table_sizes)
     // Create domains
     jg.CreateJoinCols()
     jg.DumpDatabaseGraph()

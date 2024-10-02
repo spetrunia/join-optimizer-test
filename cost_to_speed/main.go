@@ -15,7 +15,10 @@ func main() {
     rand.Seed(12664)
     fmt.Println("# Hello, World!")
 
-    jg.CreateTables()
+    table_sizes := []int{ 10, 100, 1000, 5000, 10000, 15000, 20000}
+    N_QUERIES := 100
+
+    jg.CreateTables(table_sizes)
     // Create domains
     jg.CreateJoinCols()
     jg.CollectTableStatistics()
@@ -45,11 +48,18 @@ func main() {
     if err != nil {
       log.Fatal(err)
     }
+    out_csv, err := os.Create("query_times.csv")
+    if err != nil {
+      log.Fatal(err)
+    }
 
-    for i := 1; i <=10; i++ {
+    fmt.Fprintf(out_csv, "Query, Cost, Query_time_ms\n")
+    fmt.Printf(          "Query, Cost, Query_time_ms\n")
+    for i := 1; i <= N_QUERIES; i++ {
       q:= jg.GenerateQuery()
-      micros, cost, js := dbuser.RunTestAnalyzeQuery("analyze format=json " + q)
-      fmt.Printf("Q%d,  %d,  %f\n", i, micros, cost)
+      cost, micros, js := dbuser.RunTestAnalyzeQuery("analyze format=json " + q)
+      fmt.Fprintf(out_csv, "Q%f,  %f,  %f\n", i, cost, micros/1000.0)
+      fmt.Printf(          "Q%f,  %f,  %f\n", i, cost, micros)
 
       fmt.Fprintf(qlog, "# Q%d : %d %f\nanalyze format=json\n%s\n", i, micros, cost, q);
       fmt.Fprintf(qplans, "# Q%d : %d %f\nanalyze format=json\n%s\n%s", i, micros, cost, q, js);
