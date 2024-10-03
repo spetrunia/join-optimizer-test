@@ -354,7 +354,8 @@ func GenerateQuery() string {
   query= query + "  " + tbl0 + "\n"
   //fmt.Printf("# First table %s\n", tbl0)
 
-  n_tables := 3 //rand.Intn(len(tableByNumber))
+  //n_tables := 3 //rand.Intn(len(tableByNumber))
+  n_tables := 2 + rand.Intn(min(len(tableByNumber) - 2, 6))
   for len(join_tables) < n_tables {
     // Take a random table that's in the join already
     old_tbl_name:= getRandomElement(join_tables)
