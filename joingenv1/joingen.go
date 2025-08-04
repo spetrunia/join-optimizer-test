@@ -1,4 +1,4 @@
-package joingen
+package joingenv1
 
 import (
     "database/sql"

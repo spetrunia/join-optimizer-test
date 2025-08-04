@@ -1,11 +1,11 @@
-// Test for joingen
+// Test for joingenv1
 
 package main
 
 import (
     "math/rand"
     "fmt"
-    jg "joinopttest/joingen"
+    jg "joinopttest/joingenv1"
 )
 
 func main() {

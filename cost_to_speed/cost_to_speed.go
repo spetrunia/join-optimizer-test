@@ -7,7 +7,7 @@ import (
     "fmt"
     "log"
     "os"
-    jg "joinopttest/joingen"
+    jg "joinopttest/joingenv1"
     "joinopttest/dbuser"
 )
 
