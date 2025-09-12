@@ -1,125 +1,144 @@
-
 package dbuser
 
 import (
-    "fmt"
-    "math"
-    "time"
-    "log"
-    "database/sql"
-  _  "github.com/go-sql-driver/mysql"
-    "github.com/buger/jsonparser"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"github.com/PaesslerAG/jsonpath"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
-var N_ATTEMPTS=3;
+var N_ATTEMPTS = 3
 
-var conn_str [2]string;
-var init_str [2]string;
+var conn_str [2]string
+
 var db [2]*sql.DB
 
 func Setup(server1 string, server2 string) {
-   conn_str[0]= server1
-   conn_str[1]= server2
+	conn_str[0] = server1
+	conn_str[1] = server2
 }
 
-func SetupInitString(server1 string, server2 string) {
-   init_str[0]= server1
-   init_str[1]= server2
+func Connect_servers() {
+	for i := 0; i < 2; i++ {
+		db1, err := sql.Open("mysql", conn_str[i])
+		if err != nil {
+			panic(err.Error())
+		}
+		db[i] = db1
+		//defer db.Close()
+		fmt.Printf("# Connected to server %d\n", i)
+	}
 }
 
-func Connect() {
-  for i:= 0; i < 2; i++ {
-    db1, err := sql.Open("mysql", conn_str[i] + "?multiStatements=true")
-    if err != nil {
-        panic(err.Error())
-    }
-    db[i]= db1;
-    //defer db.Close()
-    fmt.Printf("# Connected to server %d\n", i)
-  }
-}
+func SetSettings(conn int, sql string) {
+	_, err := db[conn].Exec(sql)
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("# conn[%d]: %s\n", conn, sql)
+	/*
+	   var value int;
+	   err := db[conn].QueryRow("select connection_id()").Scan(&value);
 
-func Close() {
-  for i:= 0; i < 2; i++ {
-    if (db[i] != nil) {
-      db[i].Close()
-    }
-  }
-}
+	   	if err != nil {
+	   	    panic(err.Error())
+	   	}
 
-/* 
-  Run a query once, without retries. 
-  In one-server mode, run once, otherwise run on each server.
-*/
-func RunQuery(query string) {
-  _, err := db[0].Exec(query)
-  if err !=nil {
-    panic("Query: " + query + ": error: " + err.Error())
-  }
+	   fmt.Printf("# connection_id()=%d\n", value);
+	*/
 }
 
 /*
-  This runs a test query.
-  The query is run multiple times and the best one is taken.
-  
-  @return
-    (query_speed, query_result)
+Fill the database.
+  - Do not run the same fill commands on the same database
+  - TODO: do not fill the database if it's already filled
+    (cache it)
 */
-func RunTestQuery(query string) (float64, *sql.Rows) {
-  var mintime int64
-  var best_rows *sql.Rows
-  mintime= math.MaxInt64
+func RunFillCommands(commands []string) {
+	n_servers := 2
+	fmt.Println("# Running fill commands")
+	if conn_str[0] == conn_str[1] {
+		fmt.Println("# Just once as we have one server")
+		n_servers = 1
+	}
 
-  for i:=0; i < N_ATTEMPTS; i++ {
-    a := time.Now()
-    rows, err := db[0].Query(query)
-    b := time.Now()
-    if err !=nil {
-      panic(err.Error())
-    }
-    ns:= (b.Sub(a)).Nanoseconds()
-    //fmt.Println(b.Sub(a))
-    if (ns < mintime) {
-      mintime= ns
-      best_rows= rows
-    } else {
-      rows.Close()
-    }
-  }
-  return float64(mintime)/(1000.0*1000), best_rows
+	for i := 0; i < n_servers; i++ {
+		start_time := time.Now()
+		// Feed the fill commands to the server
+		for _, sql := range commands {
+			fmt.Printf("\n%s\n", sql)
+			//_, err := db[i].Query(sql)
+			_, err := db[i].Exec(sql)
+			if err != nil {
+				panic(err.Error())
+			}
+		}
+		end_time := time.Now()
+		fmt.Printf("# Load Time: ")
+		fmt.Println(end_time.Sub(start_time))
+	}
 }
 
-/*
-  Parser:
-    go get -u github.com/buger/jsonparser
-   
-  @return 
-     min_time, cost, value
+func Perform_query(query string) {
+	var mintime int64
+	mintime = 0
 
-*/
-func RunTestAnalyzeQuery(query string) (float64, float64, string) {
-
-  min_time, best_rows := RunTestQuery(query)
-
-  if !best_rows.Next() {
-    if err:= best_rows.Err(); err!=nil {
-      log.Fatal(err);
-    } else {
-      log.Fatal("RunTestQuery got empty result set")
-    }
-  }
-
-  var value []byte
-  if err := best_rows.Scan(&value); err != nil {
-    log.Fatal(err)
-  }
-  best_rows.Close()
-  // Parse the JSON
-  cost, err :=jsonparser.GetFloat(value, "query_block", "cost")
-  if (err != nil) {
-    log.Fatal(err);
-  }
-  return cost, min_time, string(value);
+	for i := 0; i < N_ATTEMPTS; i++ {
+		a := time.Now()
+		_, err := db[i].Query(query)
+		b := time.Now()
+		if err != nil {
+			panic(err.Error())
+		}
+		ns := (b.Sub(a)).Nanoseconds()
+		fmt.Println(b.Sub(a))
+		if ns < mintime {
+			mintime = ns
+		}
+	}
 }
 
+func Close_connections() {
+	for i := 0; i < 2; i++ {
+		if db[i] != nil {
+			db[i].Close()
+		}
+	}
+}
 
+func GetExplainCosts(query string) (float64, float64) {
+	var cost [2]float64
+	var ok bool
+	for i := 0; i < 2; i++ {
+		row := db[i].QueryRow("explain format=json " + query)
+		var json_str string
+		err := row.Scan(&json_str)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		v := interface{}(nil)
+		json.Unmarshal([]byte(json_str), &v)
+
+		res, err := jsonpath.Get("$.query_block.cost", v)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		cost[i], ok = res.(float64)
+		if !ok {
+			fmt.Printf("Unexpected type for cost: %T\n", res)
+			os.Exit(1)
+		}
+	}
+	return cost[0], cost[1]
+}
+
+// TODO: do we need to accumulate/print report?
